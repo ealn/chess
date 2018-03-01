@@ -1,4 +1,3 @@
-import random
 
 #################################################################
 ####################### Global Variables ########################
@@ -17,25 +16,28 @@ EASY        = '1'
 NORMAL      = '2'
 HARD        = '3'
 
-EMP= ' '
+EMP= '-'
 INITIAL_POS = -1
 
+INFINITY_POSITIVE = 1000000
+INFINITY_NEGATIVE = 1000000
+
 ## Variables
-level = EASY           #default
-list_pieces = []
-player_color = WHITE   #default
+g_difficulty = EASY           #default
+g_list_pieces = []
+g_player_color = WHITE   #default
 
 # Chess Table (Matrix 8x8)
-#         a    b    c    d    e    f    g    h
-# col     0    1    2    3    4    5    6    7      # row   #
-table = [[EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 0     # 8
-         [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 1     # 7
-         [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 2     # 6
-         [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 3     # 5
-         [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 4     # 4
-         [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 5     # 3
-         [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 6     # 2
-         [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP]]  # 7     # 1
+#            a    b    c    d    e    f    g    h
+# col        0    1    2    3    4    5    6    7     # row   #
+g_table = [[EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 0     # 8
+           [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 1     # 7
+           [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 2     # 6
+           [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 3     # 5
+           [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 4     # 4
+           [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 5     # 3
+           [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 6     # 2
+           [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP]]  # 7     # 1
 
 #################################################################
 ############################ Classes ############################
@@ -52,8 +54,8 @@ class Piece:
     name = ""
 
     def put_piece_into_table(self):
-        global table
-        table[self.row][self.col] = self.key
+        global g_table
+        g_table[self.row][self.col] = self.key
 
     def init_position(self, row, col):
         self.row = row
@@ -61,11 +63,15 @@ class Piece:
 
     def position_contains_another_piece_same_color(self, row, col):
         ret = False
+        global g_list_pieces
+        global g_table
 
-        if table[row][col] != EMP:
+        if g_table[row][col] != EMP:
+            piece = None
+
             # search key
-            for piece in list_pieces:
-                if piece.key == table[row][col]:
+            for piece in g_list_pieces:
+                if piece.key == g_table[row][col]:
                     break
 
             if self.key != piece.key and self.color == piece.color:
@@ -97,13 +103,14 @@ class Queen(Piece):
 
         return ret
 
-    def set_positions(self, row, col):
+    def set_positions(self, row, col, showerror = True):
         if self.is_valid_movement(row, col):
             self.row = row
             self.col = col
             return True
         else:
-            print("Invalid Position")
+            if showerror:
+                print("Invalid Position")
             return False
 
     def get_all_new_positions(self):
@@ -214,20 +221,21 @@ class King(Piece):
 
         return ret
 
-    def set_positions(self, row, col):
+    def set_positions(self, row, col, showerror = True):
         if self.is_valid_movement(row, col):
             self.row = row
             self.col = col
             return True
         else:
-            print("Invalid Position")
+            if showerror:
+                print("Invalid Position")
             return False
 
     def get_all_new_positions(self):
         def append_valid_positions(list_positions, row):
             col = self.col - 1
             if col >= 0:
-                if self.position_contains_another_piece_same_color(row, col) == False:
+                if not self.position_contains_another_piece_same_color(row, col):
                     list_positions.append([row, col])
 
             col = self.col
@@ -236,7 +244,7 @@ class King(Piece):
 
             col = self.col + 1
             if col <= 7:
-                if self.position_contains_another_piece_same_color(row, col) == False:
+                if not self.position_contains_another_piece_same_color(row, col):
                     list_positions.append([row, col])
 
         list_positions = []
@@ -270,19 +278,19 @@ class Node:
     child = None
     next = None
     prev = None
-    min = 0
-    max = 0
+    level = 1
+    minimax_value = 0
+    minimax_node = None
 
-    def __init__(self, piece, parent = None, prev = None):
+    def __init__(self, piece, level = 1):
         self.piece = piece
-        self.parent = parent
-        self.prev = prev
+        self.level = level
 
 class Tree:
-    root = None
+    top_node = None
 
-    def __init__(self, root):
-        self.root = root
+    def __init__(self, top_node):
+        self.top_node = top_node
 
 
 #################################################################
@@ -324,16 +332,20 @@ def convert_index_to_asc(ind):
 ##################### Draw ######################
 
 def print_table():
+    global g_table
+
     print("  a    b    c    d    e    f    g    h")
     i = 8
-    for row in table:
+    for row in g_table:
         print(row, "{}".format(i))
         i -= 1
 
 ############### Table functions #################
 def eat_piece(key):
+    global g_list_pieces
+
     piece = get_piece_from_key(key)
-    list_pieces.remove(piece)
+    g_list_pieces.remove(piece)
 
 def get_piece_position(piece):
     valid_col = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -351,21 +363,21 @@ def init_piece_position(piece, row, col):
     piece.init_position(row, col)
 
 def set_piece_positions(piece, row, col):
-    global table
+    global g_table
     prev_row = piece.row
     prev_col = piece.col
 
     ret = piece.set_positions(row, col)
 
-    if ret == True:
+    if ret:
         # Check if this place contains another piece
-        if table[row][col] != EMP:
-            eat_piece(table[row][col])
+        if g_table[row][col] != EMP:
+            eat_piece(g_table[row][col])
 
         # clean prev position in table
-        table[prev_row][prev_col] = EMP
+        g_table[prev_row][prev_col] = EMP
         # write new position
-        table[row][col] = piece.key
+        g_table[row][col] = piece.key
 
     return ret
 
@@ -376,22 +388,22 @@ def are_positions_equals(piece1, piece2):
         return False
 
 def get_initial_positions():
-    global list_pieces
+    global g_list_pieces
     i = 0
 
     print("Insert Initial positions of pieces\n")
 
     # get positions of pieces
-    while i < len(list_pieces):
-        piece = list_pieces[i]
+    while i < len(g_list_pieces):
+        piece = g_list_pieces[i]
         row, col = get_piece_position(piece)
         init_piece_position(piece, row, col)
 
         #Verify that the position is free
         j = 0
         is_invalid = False
-        while j < len(list_pieces):
-            if piece != list_pieces[j] and are_positions_equals(piece, list_pieces[j]):
+        while j < len(g_list_pieces):
+            if piece != g_list_pieces[j] and are_positions_equals(piece, g_list_pieces[j]):
                 print("Invalid position, try again")
                 is_invalid = True
                 break
@@ -399,17 +411,19 @@ def get_initial_positions():
             j += 1
 
         if (is_invalid == False):
-            i += 1;
+            i += 1
 
 def insert_pieces_into_table():
-    for piece in list_pieces:
+    global g_list_pieces
+    for piece in g_list_pieces:
         piece.put_piece_into_table()
 
-def search_attacked_places(list_p = list_pieces):
+def search_attacked_places():
+    global g_list_pieces
     white_attacks = {}
     black_attacks = {}
 
-    for piece in list_p:
+    for piece in g_list_pieces:
         if piece.color == WHITE:
             # Add list to Dictionary
             white_attacks[piece.key] = piece.get_attacked_places()
@@ -460,39 +474,32 @@ def is_checkmate():
         #Concatenate list
         black_attacks_list += value
 
-    #Add the piece position
-    #TODO: check this part
-    #for piece in list_pieces:
-    #    if piece.color == WHITE:
-    #        white_attacks_list.append([piece.row, piece.col])
-    #    else:  #BLACK
-    #        black_attacks_list.append([piece.row, piece.col])
-    
     #Check if all movements are attacked
     ret = all_movements_are_attacked(movements_white_king, black_attacks_list)
 
-    if ret == True:
+    if ret:
         print("\nCHECKMATE: BLACK WIN")
     else:
         ret = all_movements_are_attacked(movements_black_king, white_attacks_list)
-        if ret == True:
+        if ret:
             print("\nCHECKMATE: WHITE WIN")
 
     return ret
 
 def is_draw_game():
+    global g_list_pieces
     ret = False
 
-    if len(list_pieces) == 2 \
-        and (list_pieces[0].key == WHITE_KING or list_pieces[0].key == BLACK_KING) \
-        and (list_pieces[1].key == WHITE_KING or list_pieces[1].key == BLACK_KING):
+    if len(g_list_pieces) == 2 \
+        and (g_list_pieces[0].key == WHITE_KING or g_list_pieces[0].key == BLACK_KING) \
+        and (g_list_pieces[1].key == WHITE_KING or g_list_pieces[1].key == BLACK_KING):
         ret = True
         print("\n DRAW GAME")
 
     return ret
 
-def get_not_attacked_places(piece, list_p = list_pieces):
-    white_attacks, black_attacks = search_attacked_places(list_p)
+def get_not_attacked_places(piece):
+    white_attacks, black_attacks = search_attacked_places()
     movements = piece.get_all_new_positions()
     list_attacks = []
     not_attacked_places = []
@@ -508,7 +515,7 @@ def get_not_attacked_places(piece, list_p = list_pieces):
             list_attacks += value
 
     for mov in movements:
-        if is_movement_attacked(mov, list_attacks) == False:
+        if not is_movement_attacked(mov, list_attacks):
             not_attacked_places.append(mov)
 
     return not_attacked_places
@@ -516,71 +523,303 @@ def get_not_attacked_places(piece, list_p = list_pieces):
 
 ################## Algorithm ####################
 
-def minimax(list_of_movements):
-    pass
+def heuristic(node):
+    value = 0
 
-def create_list_nodes(key, color, list_places):
+    #If the leaf node is a player movement
+    if node.level % 2 == 0:    # Min
+        value = -1
+    else:   # Max
+        value = INFINITY_POSITIVE
+
+    return value
+
+def evaluate(node):
+    if node != None and node.child == None:   #Verify that this node is a leaf
+        node.minimax_value = heuristic(node)
+
+def get_max(node):
+    max = 0
+    max_node = None
+
+    if node != None:
+        child = node.child
+
+        #Init values with the first child
+        if child != None:
+            max = child.minimax_value
+            max_node = child
+
+        while child != None:
+            if child.minimax_value > max:
+                max = child.minimax_value
+                max_node = child
+            child = child.next
+
+    return max, max_node
+
+def get_min(node):
+    min = 0
+    min_node = None
+
+    if node != None:
+        child = node.child
+
+        # Init values with the first child
+        if child != None:
+            min = child.minimax_value
+            min_node = child
+
+        while child != None:
+            if child.minimax_value < min:
+                min = child.minimax_value
+                min_node = child
+            child = child.next
+
+    return min, min_node
+
+def minimax(node):
+    if node.child != None:
+        if node.level % 2 == 0:    #Min
+            minimax_v, minimax_n = get_min(node)
+
+        else:                      #Max
+            minimax_v, minimax_n = get_max(node)
+
+        node.minimax_value = minimax_v
+        node.minimax_node = minimax_n
+    else:
+        evaluate(node)   #Leaf
+
+def search(node):
+    if node != None:
+        if node.child != None:
+            search(node.child)
+
+        minimax(node)
+
+        if node.next != None:
+            search(node.next)
+
+def get_best_movement(top_node):
+    search(top_node)
+
+    piece = top_node.minimax_node.piece
+
+    return piece.row, piece.col
+
+def create_list_nodes(parent, level, dic_places):
     list_nodes = []
 
-    # Create a list of nodes based on the not attacked places
-    for place in list_places:
-        new_piece = None
-
-        # Create pieces and add to the tree
-        if key == WHITE_QUEEN or key == BLACK_QUEEN:
-            # Create a Queen
-            new_piece = Queen(color, place[0], place[1])
-        elif key == WHITE_KING or key == BLACK_KING:
-            # Create a King
-            new_piece = King(color, place[0], place[1])
-
-        if new_piece != None:
-            node = Node(new_piece)
-            list_nodes.append(node)
+    # Create a list of nodes
+    for key, value in dic_places.items():
+        for place in value:
+            new_piece = None
+            row = place[0]
+            col = place[1]
+    
+            # Create pieces and add to the tree
+            if key == WHITE_QUEEN:
+                # Create a White Queen
+                new_piece = Queen(WHITE, row, col)
+            elif key == WHITE_KING:
+                # Create a White King
+                new_piece = King(WHITE, row, col)
+            elif key == BLACK_KING:
+                # Create a Black King
+                new_piece = King(BLACK, row, col)
+    
+            if new_piece != None:
+                node = Node(new_piece, level)
+                list_nodes.append(node)
 
     # Set prev and next nodes
     for index, node in enumerate(list_nodes):
         if index == 0:  # First element
-            # only set the next element
-            node.next = list_nodes[index + 1]
+            # only set the next element and parent
+            if len(list_nodes) > 1:
+                node.next = list_nodes[index + 1]
+            parent.child = node
         elif index == len(list_nodes) - 1:  # Last element
             # only set the prev element
             node.prev = list_nodes[index - 1]
         else:
             node.prev = list_nodes[index - 1]
             node.next = list_nodes[index + 1]
+         
+        node.parent = parent
 
-    return list_nodes[0]    #Return first element
+    return list_nodes
+
+def get_all_parent_nodes(node):
+    list_parent_nodes = []
+    
+    list_parent_nodes.append(node)
+    
+    while node.parent != None:
+        list_parent_nodes.append(node.parent)
+        node = node.parent
+    
+    return list_parent_nodes[::-1]
+
+def modify_list_pieces(parent):
+    global g_list_pieces
+    
+    list_parent_nodes = get_all_parent_nodes(parent)
+    
+    for node in list_parent_nodes:
+        node_piece = node.piece
+        piece = get_piece_from_key(node_piece.key)
+        piece.set_positions(node_piece.row, node_piece.col, False)
+    
+def create_backup_list_pieces():
+    global g_list_pieces
+
+    backup = g_list_pieces
+    copy_list = []
+
+    for piece in g_list_pieces:
+        if piece.key == WHITE_KING:
+            copy_piece = King(WHITE, piece.row, piece.col)
+        elif piece.key == WHITE_QUEEN:
+            copy_piece = Queen(WHITE, piece.row, piece.col)
+        else:    #BLACK KING
+            copy_piece = King(BLACK, piece.row, piece.col)
+
+        copy_list.append(copy_piece)
+
+    #Set global with the copy list
+    g_list_pieces = copy_list
+
+    return backup
+    
+def restore_backup_list_pieces(backup):
+    global g_list_pieces
+    g_list_pieces = backup
+
+def create_computer_answer(node, level, use_prev_pos = False):
+    backup = create_backup_list_pieces()
+    dic = {}
+    
+    modify_list_pieces(node)
+
+    if use_prev_pos:
+        dic[node.parent.piece.key] = node.parent.piece.get_all_new_positions()
+    else:
+        dic[node.piece.key] = node.piece.get_all_new_positions()
+
+    list_nodes = create_list_nodes(node, level, dic)
+    
+    restore_backup_list_pieces(backup)
+
+    return list_nodes
+    
+def create_player_answer(node, level):
+    global g_player_color
+    backup = create_backup_list_pieces()
+    
+    modify_list_pieces(node)
+
+    white_attacks, black_attacks = search_attacked_places()
+
+    if g_player_color == WHITE:
+        dic = white_attacks
+    else:
+        dic = black_attacks
+
+    list_nodes = create_list_nodes(node, level, dic)
+    
+    restore_backup_list_pieces(backup)
+
+    return list_nodes
+
+def create_level_computer_answer(parent, level, list_list_nodes):
+    def is_there_another_valid_movement(player_node):
+        ret = True
+
+        if player_node != None:
+            computer_node = player_node.parent
+            if computer_node != None:
+                #If the computer piece is eaten by the player piece
+                if computer_node.piece.row == player_node.piece.row \
+                    and computer_node.piece.col == player_node.piece.col:
+                        ret = False
+
+        return ret
+
+    list_list_computer_nodes = []
+
+    if list_list_nodes == None:
+        if parent != None:
+            list_computer_nodes = create_computer_answer(parent, level)
+            list_list_computer_nodes.append(list_computer_nodes)
+    else:
+        for list_nodes in list_list_nodes:
+            for node in list_nodes:
+                if is_there_another_valid_movement(node):
+                    list_computer_nodes = create_computer_answer(node, level, True)
+                    list_list_computer_nodes.append(list_computer_nodes)
+
+    return list_list_computer_nodes
 
 
-def create_tree(piece, places):
-    root = Node(piece)
-    tree = Tree(root)
+def create_level_player_answer(parent, level, list_list_nodes):
+    list_list_player_nodes = []
 
-    child = create_list_nodes(piece.key, piece.color, places)
-    root.child = child
-    child.parent = root
+    if list_list_nodes == None:
+        if parent != None:
+            list_player_nodes = create_player_answer(parent, level)
+            list_list_player_nodes.append(list_player_nodes)
+    else:
+        for list_nodes in list_list_nodes:
+            for node in list_nodes:
+                list_player_nodes = create_player_answer(node, level)
+                list_list_player_nodes.append(list_player_nodes)
+
+    return list_list_player_nodes
+
+def create_tree(piece):
+    global g_difficulty
+
+    top_node = Node(piece)
+    tree = Tree(top_node)
+
+    #Create first level of answers
+    list_list_computer_nodes = create_level_computer_answer(top_node, 2, None)
+
+    list_list_player_nodes = create_level_player_answer(None, 3, list_list_computer_nodes)
+    list_list_computer_nodes = create_level_computer_answer(None, 4, list_list_player_nodes)
+
+    if g_difficulty >= NORMAL:
+        #Create second level
+        list_list_player_nodes = create_level_player_answer(None, 5, list_list_computer_nodes)
+        list_list_computer_nodes = create_level_computer_answer(None, 6, list_list_player_nodes)
+
+        if g_difficulty >= HARD:
+            #Create third level
+            list_list_player_nodes = create_level_player_answer(None, 7, list_list_computer_nodes)
+            list_list_computer_nodes = create_level_computer_answer(None, 8, list_list_player_nodes)
 
     return tree
 
 ############### Init functions ##################
 
 def create_pieces():
-    global list_pieces
+    global g_list_pieces
 
     # Create list of pieces
     white_queen = Queen(WHITE)
     white_king = King(WHITE)
     black_king = King(BLACK)
 
-    list_pieces.append(white_queen)
-    list_pieces.append(white_king)
-    list_pieces.append(black_king)
+    g_list_pieces.append(white_queen)
+    g_list_pieces.append(white_king)
+    g_list_pieces.append(black_king)
 
 
 def init_game():
-    global level
-    global player_color
+    global g_difficulty
+    global g_player_color
 
     print("********************************************************************************************")
     print("*************************************  CHESS GAME ******************************************")
@@ -590,8 +829,8 @@ def init_game():
     print("\n")
     print_table()
     print("\n")
-    level = get_console_input("Select Game Level [1 - Easy, 2 - Normal, 3 - Hard]: ", [EASY, NORMAL, HARD])
-    player_color = get_console_input("Select Color [white, black]: ", [WHITE, BLACK])
+    g_difficulty = get_console_input("Select Game Level [1 - Easy, 2 - Normal, 3 - Hard]: ", [EASY, NORMAL, HARD])
+    g_player_color = get_console_input("Select Color [white, black]: ", [WHITE, BLACK])
 
     create_pieces()
     get_initial_positions()
@@ -602,21 +841,16 @@ def init_game():
 ############### Play functions ##################
 
 def move_machine_piece(piece):
-    movements = get_not_attacked_places(piece)
+    tree = create_tree(piece)
+    row, col = get_best_movement(tree.top_node)
 
-    create_tree(piece, movements)
-
-    #TODO: change this and implement minimax
-    pos = random.choice(movements)
-
-
-    set_piece_positions(piece, pos[0], pos[1])
-    print("\nMachine movement [{},{}]\n".format(convert_index_to_asc(pos[1]), convert_index_to_int(pos[0])))
+    set_piece_positions(piece, row, col)
+    print("\nMachine movement: {} to [{},{}]\n".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
 
 def machine_movement():
-    global player_color
+    global g_player_color
 
-    if player_color == WHITE:
+    if g_player_color == WHITE:
         piece = get_piece_from_key(BLACK_KING)
     else:
         #If the color is BLACK the machine always move the WHITE_QUEEN
@@ -626,10 +860,11 @@ def machine_movement():
     return move_machine_piece(piece)
 
 def get_piece_from_key(key):
+    global g_list_pieces
     piece = None
 
     # Search piece
-    for value in list_pieces:
+    for value in g_list_pieces:
         if value.key == key:
             # Piece found
             piece = value
@@ -638,9 +873,9 @@ def get_piece_from_key(key):
     return piece
 
 def select_piece_to_move():
-    global player_color
+    global g_player_color
 
-    if player_color == WHITE:
+    if g_player_color == WHITE:
         valid_opt = ['K', 'Q']
         key = get_console_input("Select piece to move [K - White King, Q - White Queen]: ", valid_opt)
     else:      #BLACK
@@ -656,8 +891,8 @@ def do_movement():
     while loop:
         row, col = get_piece_position(piece)
         is_valid = set_piece_positions(piece, row, col)
-        if is_valid == True:
-            print("\nMovement [{},{}]\n".format(convert_index_to_asc(col), convert_index_to_int(row)))
+        if is_valid:
+            print("\nMovement {} to [{},{}]\n".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
             loop = False
 
 def play():
