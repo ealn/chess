@@ -31,6 +31,7 @@ INFINITY_NEGATIVE = -1000000
 g_difficulty = EASY           #default
 g_list_pieces = []
 g_player_color = WHITE   #default
+g_debug_file = False
 
 # Chess Table (Matrix 8x8)
 #            a    b    c    d    e    f    g    h
@@ -401,12 +402,15 @@ def convert_index_to_asc(ind):
     return chr(ind + ord('a'))
 
 def print_debug_file(str):
-    try:
-        debug_file = open("tree.dbg", 'a')
-        date = datetime.datetime.now()
+    global g_debug_file
 
-        debug_file.write("{}\t:{}\n".format(date,str))
-        debug_file.close()
+    try:
+        if g_debug_file:
+            debug_file = open("tree.dbg", 'a')
+            date = datetime.datetime.now()
+
+            debug_file.write("{}\t:{}\n".format(date,str))
+            debug_file.close()
     except Exception as ex:
         print("Exception: ", ex)
     
@@ -604,6 +608,25 @@ def get_not_attacked_places(piece):
 
     return not_attacked_places
 
+def is_piece_attacked(piece):
+    ret = False
+    white_attacks, black_attacks = search_attacked_places()
+
+    if piece.color == WHITE:
+        dic = black_attacks
+    else:
+        dic = white_attacks
+
+    # If place is attacked
+    for key, value in dic.items():
+        for place in value:
+            if place[0] == piece.row and place[1] == piece.col:
+                ret = True
+                break
+        if ret == True:
+            break
+
+    return ret
 
 ################## Algorithm ####################
 
@@ -620,13 +643,16 @@ def print_node(node):
         print_debug_file("{}Name: {} Level: {} [{},{}] minimax value = {}".format(tab_space, node.piece.name, node.level, node.piece.row, node.piece.col, node.minimax_value))
 
 def print_tree(top_node):
-    if top_node != None:
-        print_node(top_node)
-    
-        if top_node.child != None:
-            print_tree(top_node.child)
-        if top_node.next != None:
-            print_tree(top_node.next)
+    global g_debug_file
+
+    if g_debug_file:
+        if top_node != None:
+            print_node(top_node)
+
+            if top_node.child != None:
+                print_tree(top_node.child)
+            if top_node.next != None:
+                print_tree(top_node.next)
 
 def calculate_table(node):
     global g_list_pieces
@@ -648,9 +674,26 @@ def calculate_table(node):
         if piece.color == g_player_color:       # Calculate the total of player
             total_after += piece.value
 
+    # Calculate the value before and after of the table
+    value = total_before - total_after
+
+    # Calculate if the piece is attacked
+    if is_piece_attacked(node.piece):
+        value -= node.piece.value      #Return the value in Negative
+
+    # Calculate if the piece can attack
+    attacked_places = node.piece.get_attacked_places()
+
+    for piece in g_list_pieces:
+        if piece.color != node.piece.color:
+            for place in attacked_places:
+                if place[0] == piece.row and place[1] == piece.col:
+                    value += 5             #Add 5 for each piece that can be attacked
+                    break
+
     restore_backup(backup_list_pieces, backup_table)
 
-    return total_before - total_after
+    return value
 
 def heuristic(node):
     value = 0
@@ -796,7 +839,8 @@ def modify_list_pieces(parent):
     for node in list_parent_nodes:
         node_piece = node.piece
         piece = get_piece_from_key(node_piece.key)
-        ret = set_piece_positions(piece, node_piece.row, node_piece.col, False)
+        if piece != None:
+            ret = set_piece_positions(piece, node_piece.row, node_piece.col, False)
     
 def create_backup():
     global g_list_pieces
@@ -881,23 +925,11 @@ def create_level_computer_answer(parent, level, list_list_nodes):
     def is_there_another_valid_movement(player_node):
         ret = True
 
-        if player_node != None:
+        if player_node != None and player_node.parent != None:
             computer_node = player_node.parent
-            white_attacks, black_attacks = search_attacked_places()
 
-            if g_player_color == WHITE:
-                dic = white_attacks
-            else:
-                dic = black_attacks
-
-            #If place is attacked
-            for key, value in dic.items():
-                for place in value:
-                    if place[0] == computer_node.piece.row and place[1] == computer_node.piece.col:
-                        ret = False
-                        break
-                if ret == False:
-                    break
+            if is_piece_attacked(computer_node.piece):
+                ret = False
 
         return ret
 
