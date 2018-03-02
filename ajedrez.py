@@ -1,3 +1,5 @@
+import datetime
+import random
 
 #################################################################
 ####################### Global Variables ########################
@@ -20,7 +22,7 @@ EMP= '-'
 INITIAL_POS = -1
 
 INFINITY_POSITIVE = 1000000
-INFINITY_NEGATIVE = 1000000
+INFINITY_NEGATIVE = -1000000
 
 ## Variables
 g_difficulty = EASY           #default
@@ -48,7 +50,6 @@ g_table = [[EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],  # 0     # 8
 class Piece:
     row = INITIAL_POS
     col = INITIAL_POS
-    is_attacked = False
     color = ""
     key = ''
     name = ""
@@ -61,21 +62,35 @@ class Piece:
         self.row = row
         self.col = col
 
-    def position_contains_another_piece_same_color(self, row, col):
-        ret = False
+    def __get_piece_at_position(self, row, col):
         global g_list_pieces
         global g_table
+        ret = None
 
         if g_table[row][col] != EMP:
-            piece = None
-
             # search key
             for piece in g_list_pieces:
                 if piece.key == g_table[row][col]:
+                    ret = piece
                     break
 
-            if self.key != piece.key and self.color == piece.color:
-                ret = True
+        return ret
+    
+    def is_there_piece_same_color(self, row, col):
+        ret = False
+        piece = self.__get_piece_at_position(row, col)
+        
+        if piece != None and piece.color == self.color:
+            ret = True
+
+        return ret
+        
+    def is_there_piece_other_color(self, row, col):
+        ret = False
+        piece = self.__get_piece_at_position(row, col)
+        
+        if piece != None and piece.color != self.color:
+            ret = True
 
         return ret
 
@@ -120,10 +135,14 @@ class Queen(Piece):
             col = 0
 
             while col <= 7:
-                if self.position_contains_another_piece_same_color(row, col):
-                    break
-                elif row != self.row or col != self.col:  # Exclude current positions
+                if row != self.row or col != self.col:  # Exclude current positions
+                    if self.is_there_piece_same_color(row, col):
+                        break
+
                     list_positions.append([row, col])
+                    
+                    if self.is_there_piece_other_color(row, col):
+                        break
                 col += 1
 
         def append_col_positions(list_positions):
@@ -132,10 +151,14 @@ class Queen(Piece):
             row = 0
 
             while row <= 7:
-                if self.position_contains_another_piece_same_color(row, col):
-                    break
-                elif row != self.row or col != self.col:  # Exclude current positions
+                if row != self.row or col != self.col:  # Exclude current positions
+                    if self.is_there_piece_same_color(row, col):
+                        break
+
                     list_positions.append([row, col])
+                    
+                    if self.is_there_piece_other_color(row, col):
+                        break
                 row += 1
 
         def append_diagonal_positions(list_positions):
@@ -144,10 +167,14 @@ class Queen(Piece):
             col = self.col
 
             while row <= 7 and col <= 7:
-                if self.position_contains_another_piece_same_color(row, col):
-                    break
-                elif row != self.row or col != self.col:  # Exclude current positions
+                if row != self.row or col != self.col:  # Exclude current positions
+                    if self.is_there_piece_same_color(row, col):
+                        break
+
                     list_positions.append([row, col])
+                    
+                    if self.is_there_piece_other_color(row, col):
+                        break
                 row += 1
                 col += 1
 
@@ -155,10 +182,14 @@ class Queen(Piece):
             col = self.col
 
             while row >= 0 and col >= 0:
-                if self.position_contains_another_piece_same_color(row, col):
-                    break
-                elif row != self.row or col != self.col:  # Exclude current positions
+                if row != self.row or col != self.col:  # Exclude current positions
+                    if self.is_there_piece_same_color(row, col):
+                        break
+
                     list_positions.append([row, col])
+                    
+                    if self.is_there_piece_other_color(row, col):
+                        break
                 row -= 1
                 col -= 1
 
@@ -166,10 +197,14 @@ class Queen(Piece):
             col = self.col
 
             while row >= 0 and col <= 7:
-                if self.position_contains_another_piece_same_color(row, col):
-                    break
-                elif row != self.row or col != self.col:  # Exclude current positions
+                if row != self.row or col != self.col:  # Exclude current positions
+                    if self.is_there_piece_same_color(row, col):
+                        break
+
                     list_positions.append([row, col])
+                    
+                    if self.is_there_piece_other_color(row, col):
+                        break
                 row -= 1
                 col += 1
 
@@ -177,10 +212,14 @@ class Queen(Piece):
             col = self.col
 
             while row <= 7 and col >= 0:
-                if self.position_contains_another_piece_same_color(row, col):
-                    break
-                elif row != self.row or col != self.col:  # Exclude current positions
+                if row != self.row or col != self.col:  # Exclude current positions
+                    if self.is_there_piece_same_color(row, col):
+                        break
+
                     list_positions.append([row, col])
+                    
+                    if self.is_there_piece_other_color(row, col):
+                        break
                 row += 1
                 col -= 1
 
@@ -231,21 +270,51 @@ class King(Piece):
                 print("Invalid Position")
             return False
 
-    def get_all_new_positions(self):
+    def get_all_new_positions(self, check_another_king = True):
+        def is_there_another_king(row, col):
+            valid = False
+
+            # Get the opposing king
+            if self.color == WHITE:
+                opposing_king = get_piece_from_key(BLACK_KING)
+            else:   #Black
+                opposing_king = get_piece_from_key(WHITE_KING)
+                
+            opposing_king_movements = opposing_king.get_all_new_positions(False)
+            
+            for position in opposing_king_movements:
+                if position[0] == row and position[1] == col:
+                    valid = True
+            
+            return valid
+            
         def append_valid_positions(list_positions, row):
             col = self.col - 1
             if col >= 0:
-                if not self.position_contains_another_piece_same_color(row, col):
-                    list_positions.append([row, col])
+                if not self.is_there_piece_same_color(row, col):
+                    if check_another_king:
+                        if not is_there_another_king(row,col):
+                            list_positions.append([row, col])
+                    else:
+                        list_positions.append([row, col])
 
             col = self.col
-            if row != self.row or col != self.col:
-                list_positions.append([row, col])
+            if row != self.row or col != self.col:    #Don't add current position
+                if not self.is_there_piece_same_color(row, col):
+                    if check_another_king:
+                        if not is_there_another_king(row,col):
+                            list_positions.append([row, col])
+                    else:
+                        list_positions.append([row, col])
 
             col = self.col + 1
             if col <= 7:
-                if not self.position_contains_another_piece_same_color(row, col):
-                    list_positions.append([row, col])
+                if not self.is_there_piece_same_color(row, col):
+                    if check_another_king:
+                        if not is_there_another_king(row,col):
+                            list_positions.append([row, col])
+                    else:
+                        list_positions.append([row, col])
 
         list_positions = []
 
@@ -329,15 +398,28 @@ def convert_index_to_int(ind):
 def convert_index_to_asc(ind):
     return chr(ind + ord('a'))
 
+def print_debug_file(str):
+    try:
+        debug_file = open("tree.dbg", 'a')
+        date = datetime.datetime.now()
+
+        debug_file.write("{}\t:{}\n".format(date,str))
+        debug_file.close()
+    except Exception as ex:
+        print("Exception: ", ex)
+    
 ##################### Draw ######################
 
 def print_table():
     global g_table
 
     print("  a    b    c    d    e    f    g    h")
+    print_debug_file("  a    b    c    d    e    f    g    h")
+    
     i = 8
     for row in g_table:
-        print(row, "{}".format(i))
+        print("{} {}".format(row, i))
+        print_debug_file("{} {}".format(row, i))
         i -= 1
 
 ############### Table functions #################
@@ -362,12 +444,12 @@ def get_piece_position(piece):
 def init_piece_position(piece, row, col):
     piece.init_position(row, col)
 
-def set_piece_positions(piece, row, col):
+def set_piece_positions(piece, row, col, show_error = True):
     global g_table
     prev_row = piece.row
     prev_col = piece.col
 
-    ret = piece.set_positions(row, col)
+    ret = piece.set_positions(row, col, show_error)
 
     if ret:
         # Check if this place contains another piece
@@ -523,20 +605,38 @@ def get_not_attacked_places(piece):
 
 ################## Algorithm ####################
 
+def print_node(node):
+    if node != None:
+        tab = '\t'
+        tab_space = ''
+        level = node.level
+        
+        while level > 1:
+            tab_space += tab
+            level -= 1
+            
+        print_debug_file("{}Name: {} Level: {} [{},{}] minimax value = {}".format(tab_space, node.piece.name, node.level, node.piece.row, node.piece.col, node.minimax_value))
+
+def print_tree(top_node):
+    if top_node != None:
+        print_node(top_node)
+    
+        if top_node.child != None:
+            print_tree(top_node.child)
+        if top_node.next != None:
+            print_tree(top_node.next)
+
 def heuristic(node):
     value = 0
 
-    #If the leaf node is a player movement
-    if node.level % 2 == 0:    # Min
-        value = -1
-    else:   # Max
-        value = INFINITY_POSITIVE
+    if node != None and node.child == None:  #Verify that this node is a leaf
+        if node.level % 2 == 0:    # Min
+            value = 1
+        else:   # Max, the leaf node is a player movement
+            # Player win
+            value = INFINITY_NEGATIVE
 
     return value
-
-def evaluate(node):
-    if node != None and node.child == None:   #Verify that this node is a leaf
-        node.minimax_value = heuristic(node)
 
 def get_max(node):
     max = 0
@@ -589,7 +689,7 @@ def minimax(node):
         node.minimax_value = minimax_v
         node.minimax_node = minimax_n
     else:
-        evaluate(node)   #Leaf
+        node.minimax_value = heuristic(node)   #Leaf
 
 def search(node):
     if node != None:
@@ -670,13 +770,26 @@ def modify_list_pieces(parent):
     for node in list_parent_nodes:
         node_piece = node.piece
         piece = get_piece_from_key(node_piece.key)
-        piece.set_positions(node_piece.row, node_piece.col, False)
+        ret = set_piece_positions(piece, node_piece.row, node_piece.col, False)
     
-def create_backup_list_pieces():
+def create_backup():
     global g_list_pieces
+    global g_table
 
-    backup = g_list_pieces
+    #Create backup
+    backup_list_pieces = g_list_pieces
+    backup_table = g_table
+
+    #Create copy
     copy_list = []
+    copy_table = [[EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],
+                  [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],
+                  [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],
+                  [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],
+                  [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],
+                  [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],
+                  [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP],
+                  [EMP, EMP, EMP, EMP, EMP, EMP, EMP, EMP]]
 
     for piece in g_list_pieces:
         if piece.key == WHITE_KING:
@@ -687,18 +800,23 @@ def create_backup_list_pieces():
             copy_piece = King(BLACK, piece.row, piece.col)
 
         copy_list.append(copy_piece)
+        copy_table[piece.row][piece.col] = piece.key
 
-    #Set global with the copy list
+    #Set global with the copy
     g_list_pieces = copy_list
+    g_table = copy_table
 
-    return backup
+    return backup_list_pieces, backup_table
     
-def restore_backup_list_pieces(backup):
+def restore_backup(backup_list_pieces, backup_table):
     global g_list_pieces
-    g_list_pieces = backup
+    global g_table
+
+    g_list_pieces = backup_list_pieces
+    g_table = backup_table
 
 def create_computer_answer(node, level, use_prev_pos = False):
-    backup = create_backup_list_pieces()
+    backup_list_pieces, backup_table = create_backup()
     dic = {}
     
     modify_list_pieces(node)
@@ -710,13 +828,13 @@ def create_computer_answer(node, level, use_prev_pos = False):
 
     list_nodes = create_list_nodes(node, level, dic)
     
-    restore_backup_list_pieces(backup)
+    restore_backup(backup_list_pieces, backup_table)
 
     return list_nodes
     
 def create_player_answer(node, level):
     global g_player_color
-    backup = create_backup_list_pieces()
+    backup_list_pieces, backup_table = create_backup()
     
     modify_list_pieces(node)
 
@@ -728,8 +846,8 @@ def create_player_answer(node, level):
         dic = black_attacks
 
     list_nodes = create_list_nodes(node, level, dic)
-    
-    restore_backup_list_pieces(backup)
+
+    restore_backup(backup_list_pieces, backup_table)
 
     return list_nodes
 
@@ -739,11 +857,21 @@ def create_level_computer_answer(parent, level, list_list_nodes):
 
         if player_node != None:
             computer_node = player_node.parent
-            if computer_node != None:
-                #If the computer piece is eaten by the player piece
-                if computer_node.piece.row == player_node.piece.row \
-                    and computer_node.piece.col == player_node.piece.col:
+            white_attacks, black_attacks = search_attacked_places()
+
+            if g_player_color == WHITE:
+                dic = white_attacks
+            else:
+                dic = black_attacks
+
+            #If place is attacked
+            for key, value in dic.items():
+                for place in value:
+                    if place[0] == computer_node.piece.row and place[1] == computer_node.piece.col:
                         ret = False
+                        break
+                if ret == False:
+                    break
 
         return ret
 
@@ -827,6 +955,7 @@ def init_game():
     print("\n")
     print("Final stage. Pieces: White Queen, White King, Black King")
     print("\n")
+    print_debug_file("********************************************************************************************")
     print_table()
     print("\n")
     g_difficulty = get_console_input("Select Game Level [1 - Easy, 2 - Normal, 3 - Hard]: ", [EASY, NORMAL, HARD])
@@ -836,6 +965,8 @@ def init_game():
     get_initial_positions()
     insert_pieces_into_table()
 
+    print_debug_file("Init Game level: {} color: {}".format(g_difficulty, g_player_color))
+
     print_table()
 
 ############### Play functions ##################
@@ -843,9 +974,13 @@ def init_game():
 def move_machine_piece(piece):
     tree = create_tree(piece)
     row, col = get_best_movement(tree.top_node)
+    print_tree(tree.top_node)
 
-    set_piece_positions(piece, row, col)
-    print("\nMachine movement: {} to [{},{}]\n".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
+    is_valid = set_piece_positions(piece, row, col)
+    
+    if is_valid:
+        print("\nMachine movement: {} to [{},{}]\n".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
+        print_debug_file("Machine movement: {} to [{},{}]".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
 
 def machine_movement():
     global g_player_color
@@ -853,9 +988,9 @@ def machine_movement():
     if g_player_color == WHITE:
         piece = get_piece_from_key(BLACK_KING)
     else:
-        #If the color is BLACK the machine always move the WHITE_QUEEN
-        #because the king cannot be eaten
-        piece = get_piece_from_key(WHITE_QUEEN)
+        #Get random the piece to move
+        key = random.choice([WHITE_QUEEN, WHITE_KING])
+        piece = get_piece_from_key(key)
 
     return move_machine_piece(piece)
 
@@ -893,29 +1028,39 @@ def do_movement():
         is_valid = set_piece_positions(piece, row, col)
         if is_valid:
             print("\nMovement {} to [{},{}]\n".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
+            print_debug_file("Movement {} to [{},{}]".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
             loop = False
 
+def is_valid_another_movement():
+    ret = True
+    
+    if is_checkmate() or is_draw_game():
+        ret = False
+    
+    return ret
+            
+           
 def play():
     loop = True
 
-    do_movement()
-    print_table()
-
-    machine_movement()
-    print_table()
-
-    if is_checkmate():
-        loop = False
-    elif is_draw_game():
-        loop = False
+    while loop:    #infinity loop until checkmate or draw game
+        loop = is_valid_another_movement()
+        
+        if loop:
+            do_movement()
+            print_table()
+        
+            loop = is_valid_another_movement()
+            
+            if loop:
+                machine_movement()
+                print_table()
 
     return loop
 
 def main():
     init_game()
-
-    while play():       #infinity loop until checkmate
-        pass
+    play()
 
 #When this script is called as main, run the main function
 if __name__ == '__main__':
