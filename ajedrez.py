@@ -21,6 +21,9 @@ HARD        = '3'
 EMP= '-'
 INITIAL_POS = -1
 
+KING_VALUE =  50
+QUEEN_VALUE = 500
+
 INFINITY_POSITIVE = 1000000
 INFINITY_NEGATIVE = -1000000
 
@@ -53,6 +56,7 @@ class Piece:
     color = ""
     key = ''
     name = ""
+    value = 0
 
     def put_piece_into_table(self):
         global g_table
@@ -106,6 +110,7 @@ class Queen(Piece):
             self.key = WHITE_QUEEN
         else:
             self.key = BLACK_QUEEN
+        self.value = QUEEN_VALUE
 
     def is_valid_movement(self, row, col):
         ret = False
@@ -243,6 +248,7 @@ class King(Piece):
             self.key = WHITE_KING
         else:
             self.key = BLACK_KING
+        self.value = KING_VALUE
 
     def is_valid_movement(self, row, col):
         ret = False
@@ -274,12 +280,13 @@ class King(Piece):
                 opposing_king = get_piece_from_key(BLACK_KING)
             else:   #Black
                 opposing_king = get_piece_from_key(WHITE_KING)
-                
-            opposing_king_movements = opposing_king.get_all_new_positions(False)
-            
-            for position in opposing_king_movements:
-                if position[0] == row and position[1] == col:
-                    valid = True
+
+            if opposing_king != None:
+                opposing_king_movements = opposing_king.get_all_new_positions(False)
+
+                for position in opposing_king_movements:
+                    if position[0] == row and position[1] == col:
+                        valid = True
             
             return valid
             
@@ -621,12 +628,36 @@ def print_tree(top_node):
         if top_node.next != None:
             print_tree(top_node.next)
 
+def calculate_table(node):
+    global g_list_pieces
+    global g_player_color
+    total_before = 0
+    total_after = 0
+
+    #Calculate before
+    for piece in g_list_pieces:
+        if piece.color == g_player_color:       # Calculate the total of player
+            total_before += piece.value
+
+    backup_list_pieces, backup_table = create_backup()
+
+    modify_list_pieces(node)
+
+    # Calculate after
+    for piece in g_list_pieces:
+        if piece.color == g_player_color:       # Calculate the total of player
+            total_after += piece.value
+
+    restore_backup(backup_list_pieces, backup_table)
+
+    return total_before - total_after
+
 def heuristic(node):
     value = 0
 
     if node != None and node.child == None:  #Verify that this node is a leaf
         if node.level % 2 == 0:    # Min
-            value = 1
+            value = calculate_table(node)
         else:   # Max, the leaf node is a player movement
             # Player win
             value = INFINITY_NEGATIVE
@@ -1020,11 +1051,26 @@ def do_movement():
 
     while loop:
         row, col = get_piece_position(piece)
-        is_valid = set_piece_positions(piece, row, col)
+        is_valid = True
+
+        if piece.key == BLACK_KING or piece.key == WHITE_KING:
+            not_attacked_places = get_not_attacked_places(piece)
+            is_valid = False
+
+            #Search if the new position is attacked
+            for place in not_attacked_places:
+                if place[0] == row and place[1] == col:
+                    is_valid = True
+
+            if not is_valid:
+                print("Invalid Position")
+
         if is_valid:
-            print("\nMovement {} to [{},{}]\n".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
-            print_debug_file("Movement {} to [{},{}]".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
-            loop = False
+            is_valid = set_piece_positions(piece, row, col)
+            if is_valid:
+                print("\nMovement {} to [{},{}]\n".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
+                print_debug_file("Movement {} to [{},{}]".format(piece.name, convert_index_to_asc(col), convert_index_to_int(row)))
+                loop = False
 
 def is_valid_another_movement():
     ret = True
