@@ -128,38 +128,57 @@ class Queen(Piece):
                 print("Invalid Position")
             return False
 
-    def get_all_new_positions(self):
+    def get_all_new_positions(self, check_entire_line = False):
+        def append_position(list_positions, row, col):
+            break_loop = False
+
+            if row != self.row or col != self.col:  # Exclude current positions
+                if self.is_there_piece_same_color(row, col):
+                    break_loop = True
+
+                list_positions.append([row, col])
+
+                if not check_entire_line:
+                    if self.is_there_piece_other_color(row, col):
+                        break_loop = True
+
+            return break_loop
+
         def append_row_positions(list_positions):
             # Insert positions of current row
             row = self.row
-            col = 0
+            col = self.col
 
             while col <= 7:
-                if row != self.row or col != self.col:  # Exclude current positions
-                    if self.is_there_piece_same_color(row, col):
-                        break
-
-                    list_positions.append([row, col])
-                    
-                    if self.is_there_piece_other_color(row, col):
-                        break
+                if append_position(list_positions, row, col):
+                    break
                 col += 1
+
+            row = self.row
+            col = self.col
+
+            while col >= 0:
+                if append_position(list_positions, row, col):
+                    break
+                col -= 1
 
         def append_col_positions(list_positions):
             # Insert positions of current column
+            row = self.row
             col = self.col
-            row = 0
 
             while row <= 7:
-                if row != self.row or col != self.col:  # Exclude current positions
-                    if self.is_there_piece_same_color(row, col):
-                        break
-
-                    list_positions.append([row, col])
-                    
-                    if self.is_there_piece_other_color(row, col):
-                        break
+                if append_position(list_positions, row, col):
+                    break
                 row += 1
+
+            row = self.row
+            col = self.col
+
+            while row >= 0:
+                if append_position(list_positions, row, col):
+                    break
+                row -= 1
 
         def append_diagonal_positions(list_positions):
             # Insert diagonals
@@ -167,14 +186,8 @@ class Queen(Piece):
             col = self.col
 
             while row <= 7 and col <= 7:
-                if row != self.row or col != self.col:  # Exclude current positions
-                    if self.is_there_piece_same_color(row, col):
-                        break
-
-                    list_positions.append([row, col])
-                    
-                    if self.is_there_piece_other_color(row, col):
-                        break
+                if append_position(list_positions, row, col):
+                    break
                 row += 1
                 col += 1
 
@@ -182,14 +195,8 @@ class Queen(Piece):
             col = self.col
 
             while row >= 0 and col >= 0:
-                if row != self.row or col != self.col:  # Exclude current positions
-                    if self.is_there_piece_same_color(row, col):
-                        break
-
-                    list_positions.append([row, col])
-                    
-                    if self.is_there_piece_other_color(row, col):
-                        break
+                if append_position(list_positions, row, col):
+                    break
                 row -= 1
                 col -= 1
 
@@ -197,14 +204,8 @@ class Queen(Piece):
             col = self.col
 
             while row >= 0 and col <= 7:
-                if row != self.row or col != self.col:  # Exclude current positions
-                    if self.is_there_piece_same_color(row, col):
-                        break
-
-                    list_positions.append([row, col])
-                    
-                    if self.is_there_piece_other_color(row, col):
-                        break
+                if append_position(list_positions, row, col):
+                    break
                 row -= 1
                 col += 1
 
@@ -212,14 +213,8 @@ class Queen(Piece):
             col = self.col
 
             while row <= 7 and col >= 0:
-                if row != self.row or col != self.col:  # Exclude current positions
-                    if self.is_there_piece_same_color(row, col):
-                        break
-
-                    list_positions.append([row, col])
-                    
-                    if self.is_there_piece_other_color(row, col):
-                        break
+                if append_position(list_positions, row, col):
+                    break
                 row += 1
                 col -= 1
 
@@ -234,7 +229,7 @@ class Queen(Piece):
     def get_attacked_places(self):
         # Since the Queen can attack in all posible positions
         # return the positions
-        return self.get_all_new_positions()
+        return self.get_all_new_positions(check_entire_line = True)
 
 class King(Piece):
 
